@@ -4,29 +4,57 @@
 
 --The subroutine itself, called later as "my retrieveSecret("mySecretIdentifier")"
 on retrieveSecret(secretID)
-  --Initial command uses the aws command line tool and returns only the lines with "SecretString".
+	--Initial command uses the aws command line tool and returns only the lines with "SecretString".
 	set secretReturn to (do shell script "/usr/local/bin/aws secretsmanager get-secret-value --secret-id " & secretID & " | grep 'SecretString'")
-  --Parses the output of the command. First, removes the prefix…
+	--Parses the output of the command. First, removes the prefix…
 	set AppleScript's text item delimiters to "    \"SecretString\": \"{\\\""
 	set secretBlob to text item 2 of secretReturn
-  --…separates the values using a closing quote and colon…
-	set AppleScript's text item delimiters to "\\\":"
-	set {secretKey, secretValue} to text items of secretBlob
-  --…removes the closing curly bracket from the secretValue…
-	set AppleScript's text item delimiters to "\\\"}"
-	set secretValue to text item 1 of secretValue
-  --…removes the opening quote from secretValue…
-	set AppleScript's text item delimiters to "\\\""
-	set secretValue to text item 2 of secretValue
-	set AppleScript's text item delimiters to ""
-  --…and returns the clean key/value pair!
-	return {secretKey, secretValue}
+	
+	if secretBlob contains "\\\",\\\"" then
+		set multiSecret to {}
+		set secretKeyList to {}
+		set secretValueList to {}
+		set AppleScript's text item delimiters to "\\\",\\\""
+		repeat with i from 1 to (count text items of secretBlob)
+			copy (text item i of secretBlob) to the end of multiSecret
+		end repeat
+		repeat with secretCount from 1 to (count multiSecret)
+			set activeBlob to item secretCount of multiSecret
+			--…separates the values using a closing quote and colon…
+			set AppleScript's text item delimiters to "\\\":"
+			set {secretKey, secretValue} to text items of activeBlob
+			--…removes the opening quote from secretValue…
+			set AppleScript's text item delimiters to "\\\""
+			set secretValue to text item 2 of secretValue
+			--…removes the closing curly bracket from the secretValue if the last one…
+			if secretCount is equal to (count multiSecret) then
+				set AppleScript's text item delimiters to "\\\"}"
+				set secretValue to text item 1 of secretValue
+			end if
+			set AppleScript's text item delimiters to ""
+			copy secretKey to the end of secretKeyList
+			copy secretValue to the end of secretValueList
+		end repeat
+		return {secretKeyList, secretValueList}
+	else
+		set AppleScript's text item delimiters to "\\\":"
+		--…separates the values using a closing quote and colon…
+		set {secretKey, secretValue} to text items of secretBlob
+		set AppleScript's text item delimiters to "\\\"}"
+		set secretValue to text item 1 of secretValue
+		set AppleScript's text item delimiters to "\\\""
+		set secretValue to text item 2 of secretValue
+		set AppleScript's text item delimiters to ""
+			--…and returns the clean key/value pair(s)!
+		return {secretKey, secretValue}
+	end if
 end retrieveSecret
 
 
 --Replace "viewLaunchCode" with the ID of your AWS secret.
-set {nameOfSecret,mySecretValue} to my retrieveSecret("viewLaunchCode")
+set {namesOfSecret, mySecretValues} to my retrieveSecret("viewLaunchCode")
 
-display dialog "Your secret " & nameOfSecret & " is " & mySecretValue
-
---Multi-Secret support coming next!
+--This sample code will display the keys and values retrieved in a dialog, one per key-value pair.
+repeat with i from 1 to (count namesOfSecret)
+	display dialog "Secret " & i & ", called " & (item i of namesOfSecret as string) & ", is " & (item i of mySecretValues as string) & "."
+end repeat
