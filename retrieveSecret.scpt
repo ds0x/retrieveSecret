@@ -4,12 +4,18 @@
 
 --The subroutine itself, called later as "my retrieveSecret("mySecretIdentifier")"
 on retrieveSecret(secretID)
+	set x86orASi to CPU type of (system info)
+	if x86orASi contains "ARM" then
+		set brewPath to "/opt/homebrew/bin/brew"
+	else
+		set brewPath to "/usr/local/bin/brew"
+	end if
 	--Initial command uses the aws command line tool and returns only the lines with "SecretString".
-	set secretReturn to (do shell script "/usr/local/bin/aws secretsmanager get-secret-value --secret-id " & secretID & " | grep 'SecretString'")
+	set secretReturn to (do shell script brewPath & "aws secretsmanager get-secret-value --secret-id " & secretID & " | grep 'SecretString'")
 	--Parses the output of the command. First, removes the prefix…
 	set AppleScript's text item delimiters to "    \"SecretString\": \"{\\\""
 	set secretBlob to text item 2 of secretReturn
-	
+	--Checks if multiple items are present, and creates a set of lists to return if so.
 	if secretBlob contains "\\\",\\\"" then
 		set multiSecret to {}
 		set secretKeyList to {}
@@ -20,7 +26,7 @@ on retrieveSecret(secretID)
 		end repeat
 		repeat with secretCount from 1 to (count multiSecret)
 			set activeBlob to item secretCount of multiSecret
-			--…separates the values using a closing quote and colon…
+			--…separates the key and value using a closing quote and colon…
 			set AppleScript's text item delimiters to "\\\":"
 			set {secretKey, secretValue} to text items of activeBlob
 			--…removes the opening quote from secretValue…
@@ -37,15 +43,17 @@ on retrieveSecret(secretID)
 		end repeat
 		return {secretKeyList, secretValueList}
 	else
+		--…separate the key and value using a closing quote and colon…
 		set AppleScript's text item delimiters to "\\\":"
-		--…separates the values using a closing quote and colon…
 		set {secretKey, secretValue} to text items of secretBlob
+		--…removes the closing curly bracket from the secretValue…
 		set AppleScript's text item delimiters to "\\\"}"
 		set secretValue to text item 1 of secretValue
+		--…cleans the opening quote from secretValue…
 		set AppleScript's text item delimiters to "\\\""
 		set secretValue to text item 2 of secretValue
 		set AppleScript's text item delimiters to ""
-			--…and returns the clean key/value pair(s)!
+		--…and returns the clean key/value pair(s)!
 		return {secretKey, secretValue}
 	end if
 end retrieveSecret
