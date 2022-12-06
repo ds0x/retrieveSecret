@@ -4,14 +4,15 @@
 
 --The subroutine itself, called later as "my retrieveSecret("mySecretIdentifier")"
 on retrieveSecret(secretID)
+	--Detects the architecture type and sets AWS binary paths appropriately.
 	set x86orASi to CPU type of (system info)
 	if x86orASi contains "ARM" then
-		set brewPath to "/opt/homebrew/bin/brew"
+		set awsPath to "/opt/homebrew/bin/"
 	else
-		set brewPath to "/usr/local/bin/brew"
+		set awsPath to "/usr/local/bin/"
 	end if
 	--Initial command uses the aws command line tool and returns only the lines with "SecretString".
-	set secretReturn to (do shell script brewPath & "aws secretsmanager get-secret-value --secret-id " & secretID & " | grep 'SecretString'")
+	set secretReturn to (do shell script awsPath & "aws secretsmanager get-secret-value --secret-id " & secretID & " | grep 'SecretString'")
 	--Parses the output of the command. First, removes the prefix…
 	set AppleScript's text item delimiters to "    \"SecretString\": \"{\\\""
 	set secretBlob to text item 2 of secretReturn
@@ -64,5 +65,5 @@ set {namesOfSecret, mySecretValues} to my retrieveSecret("viewLaunchCode")
 
 --This sample code will display the keys and values retrieved in a dialog, one per key-value pair.
 repeat with i from 1 to (count namesOfSecret)
-	display dialog "Secret " & i & ", called " & (item i of namesOfSecret as string) & ", is " & (item i of mySecretValues as string) & "."
+	display dialog "Secret " & i & ", called " & (item i of namesOfSecret as string) & ", is " & (item i of mySecretValues as string)
 end repeat
