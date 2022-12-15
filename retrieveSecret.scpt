@@ -1,9 +1,15 @@
 --retrieveSecret: an AppleScript subroutine to retrieve secrets from AWS Secrets Manager.
 --Disclaimer: retrieveSecret requires IAM permissions on the host to read the secret.
+on awsMD(MDPath)
+	set sessionToken to (do shell script "curl -X PUT http://169.254.169.254/latest/api/token -s -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600'")
+	set MDReturn to (do shell script "curl -H 'X-aws-ec2-metadata-token: " & sessionToken & "' -s http://169.254.169.254/latest/meta-data/" & MDPath)
+	return MDReturn
+end awsMD
 
+set currentRegion to (my awsMD("placement/region"))
 
 --The subroutine itself, called later as "my retrieveSecret("mySecretIdentifier")"
-on retrieveSecret(secretID)
+on retrieveSecret(secretRegion, secretID)
 	--Detects the architecture type and sets AWS binary paths appropriately.
 	set x86orASi to CPU type of (system info)
 	if x86orASi contains "ARM" then
@@ -12,9 +18,9 @@ on retrieveSecret(secretID)
 		set awsPath to "/usr/local/bin/"
 	end if
 	--Initial command uses the aws command line tool and returns only the lines with "SecretString".
-	set secretReturn to (do shell script awsPath & "aws secretsmanager get-secret-value --secret-id " & secretID & " | grep 'SecretString'")
+	set secretReturn to (do shell script awsPath & "aws secretsmanager get-secret-value --region " & secretRegion & " --secret-id " & secretID & " --query SecretString")
 	--Parses the output of the command. First, removes the prefix…
-	set AppleScript's text item delimiters to "    \"SecretString\": \"{\\\""
+	set AppleScript's text item delimiters to "\"{\\\""
 	set secretBlob to text item 2 of secretReturn
 	--Checks if multiple items are present, and creates a set of lists to return if so.
 	if secretBlob contains "\\\",\\\"" then
@@ -61,7 +67,7 @@ end retrieveSecret
 
 
 --Replace "viewLaunchCode" with the ID of your AWS secret.
-set {namesOfSecret, mySecretValues} to my retrieveSecret("viewLaunchCode")
+set {namesOfSecret, mySecretValues} to my retrieveSecret(currentRegion, "viewLaunchCode")
 
 --This sample code will display the keys and values retrieved in a dialog, one per key-value pair.
 repeat with i from 1 to (count namesOfSecret)
