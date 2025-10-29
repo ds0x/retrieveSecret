@@ -66,7 +66,7 @@ on retrieveSecret(secretRegion, secretID)
 end retrieveSecret
 
 
---Replace "viewLaunchCode" with the ID of your AWS secret.
+--Replace "viewLaunchCode" with the name of your AWS secret.
 set {namesOfSecret, mySecretValues} to my retrieveSecret(currentRegion, "viewLaunchCode")
 
 --This sample code will display the keys and values retrieved in a dialog, one per key-value pair.
